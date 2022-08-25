@@ -6,38 +6,14 @@ interface State {
 }
 
 const data = [
-    {
-        key: "1",
-        url: "./assets/cactus.png"
-    },
-    {
-        key: "2",
-        url: "./assets/durian.png"
-    },
-    {
-        key: "3",
-        url: "./assets/mushroom.png"
-    },
-    {
-        key: "4",
-        url: "./assets/rain.png"
-    },
-    {
-        key: "5",
-        url: "./assets/seed.png"
-    },
-    {
-        key: "6",
-        url: "./assets/sunflower.png"
-    },
-    {
-        key: "7",
-        url: "./assets/tree.png"
-    },
-    {
-        key: "8",
-        url: "./assets/rainbow.png"
-    }
+    { src: "./assets/cactus.png"    },
+    { src: "./assets/durian.png"    },
+    { src: "./assets/mushroom.png"  },
+    { src: "./assets/rain.png"      },
+    { src: "./assets/seed.png"      },
+    { src: "./assets/sunflower.png" },
+    { src: "./assets/tree.png"      },
+    { src: "./assets/rainbow.png"   }
 ];
 
 //lista em state que vai ser a lista para mostrar (a lista data é fixa com todos os imports);
@@ -50,7 +26,7 @@ const Game = () => {
     const [elapsedTime, setElapsedTime] = useState(0)
     const [running, setRunning] = useState(false)
     const [intervalId, setIntervalId] = useState(-1)
-    const [cardList, setCardList] = useState();
+    const [cardList, setCardList] = useState([]);
 
     const startTimer = useCallback(() => {
 		const id = setInterval(() => {
@@ -58,7 +34,7 @@ const Game = () => {
 		}, 1000)
 		
 		setIntervalId(id)
-        onStart();
+        shuffleCards();
 	}, [])
 
     const stopTimer = useCallback(() => {
@@ -83,24 +59,20 @@ const Game = () => {
 		return `${minutes.padStart(2, '0')}: ${seconds.padStart(2, '0')}`
 	}, [elapsedTime])
 
-    const onStart = () => {
-        let newData: any = [];
-
-        data.forEach(item => {
-            newData.push(item);
-            newData.push(item); //melhorar essa passagem de dados;
-        });
-
+    const shuffleCards = () => {
+        let newData: any = [...data, ...data]
+            .sort(() => Math.random() - 0.5)
+            .map((card) => ({ ...card, id: Math.random()}))
         setCardList(newData);
     }
 
-    const renderItem = (item: any) => {
-        return (
-            <View style={appStyles.card}>
-                <Image source={item.url}/>
-            </View>
-        )
-    }
+    // const renderItem = (item: any) => {
+    //     return (
+    //         <View style={appStyles.card}>
+    //             <Image source={item}/>
+    //         </View>
+    //     )
+    // }
 
     return(
             <View>
@@ -108,15 +80,22 @@ const Game = () => {
 
                 <Text style={appStyles.timer}>{getTimeFormatted()}</Text>
 
-                <FlatList
-                    data={data}
-                    renderItem={() => renderItem(cardList)}
+                <Button title={running ? 'Reiniciar' : 'Iniciar'} onPress={startTimer} />
+
+                <FlatList 
+                    style={appStyles.flatList}
+                    data={cardList}
+                    renderItem={({item}) => {
+                        return(
+                            <View style={appStyles.card}>
+                                <Image source={{uri: item}}/>
+                            </View>
+                        ) 
+                    }}
                     numColumns={4}
-                    keyExtractor={(index) => index.toString()}
+                    keyExtractor={(_, index) => index.toString()}
                     contentContainerStyle={{ padding: 10 }}
                 />
-
-                <Button title={running ? 'Reiniciar' : 'Iniciar'} onPress={startTimer} />
 
             <Text style={appStyles.message}>Faltam { 0 /*pairsCount*/} pares</Text>
             </View>
@@ -154,6 +133,10 @@ const appStyles = StyleSheet.create({
         color: "#ffffff",
         fontSize: 16,
         marginTop: 50,
+    },
+    flatList: {
+        backgroundColor: 'red',
+        flexGrow: 0,
     },
     card: {
         display: "flex",
