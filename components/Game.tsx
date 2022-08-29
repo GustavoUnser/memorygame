@@ -1,9 +1,24 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Button, FlatList, Dimensions, StyleSheet, Text, View, Image } from "react-native";
+import { Button, FlatList, Dimensions, StyleSheet, Text, View, Image, TouchableWithoutFeedback } from "react-native";
 
-interface State {
-    pairsLeft: number;
+enum State {
+    HIDED,
+    VISIBLE,
+    MATCHED,
 }
+
+enum ActionMemorizer {
+    PLAYING,
+    WAITING,
+    FINISHED,
+}
+
+interface ItemMemorizer {
+    data: string,
+    state: State,
+}
+  
+  
 
 const data = [
     { src: "./assets/cactus.png"    },
@@ -14,7 +29,7 @@ const data = [
     { src: "./assets/sunflower.png" },
     { src: "./assets/tree.png"      },
     { src: "./assets/rainbow.png"   }
-];
+]
 
 //lista em state que vai ser a lista para mostrar (a lista data é fixa com todos os imports);
 //Ao clicar "Iniciar", chama um metodo que cria uma nova lista local no proprio metodo, percorre a [data] com foreach e da 2 push da lista na nova lista e embaralhando essa lista;
@@ -27,37 +42,49 @@ const Game = () => {
     const [running, setRunning] = useState(false)
     const [intervalId, setIntervalId] = useState(-1)
     const [cardList, setCardList] = useState([]);
+    const [memorizerGrid, setMemorizerGrid] = useState<ItemMemorizer[]>([])
+    const [pairsLeft, setPairsLeft] = useState(8)
+    const [action, setAction] = useState(ActionMemorizer.WAITING)
 
     const startTimer = useCallback(() => {
-		const id = setInterval(() => {
-			setElapsedTime(currentValue => currentValue + 1)
-		}, 1000)
-		
-		setIntervalId(id)
-        shuffleCards();
-	}, [])
+        const id = setInterval(() => {
+          setElapsedTime(currentValue => currentValue + 1)
+        }, 1000)
+    
+        setIntervalId(id)
+      }, [])
+    
 
     const stopTimer = useCallback(() => {
 		clearInterval(intervalId)
 	}, [intervalId])
-
+    
     useEffect(() => {
-		if (running) {
-			startTimer()
-		} else {
-			stopTimer()
-		}
-	}, [running])
+        if (running) {
+          startTimer()
+        } else {
+          restartTimer(ActionMemorizer.FINISHED)
+          stopTimer()
+        }
+    }, [running])
 
-    const restartTimer = useCallback(() => {
-		setElapsedTime(0)
-	}, [])
+    const restartTimer = useCallback((newAction: ActionMemorizer) => {
+        setAction(newAction)
+        setElapsedTime(0)
+      }, [])
+
+    const toggleRunning = () => {
+        setRunning(!running)
+        if (action === ActionMemorizer.WAITING) {
+          setAction(ActionMemorizer.PLAYING)
+        }
+    }
 
     const getTimeFormatted = useCallback(() => {
-		const minutes = String(Math.floor(elapsedTime/60))
-		const seconds = String((elapsedTime % 60))
-		return `${minutes.padStart(2, '0')}: ${seconds.padStart(2, '0')}`
-	}, [elapsedTime])
+        const minutes = Math.floor(elapsedTime / 60).toString()
+        const seconds = (elapsedTime % 60).toString()
+        return `${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`
+      }, [elapsedTime])
 
     const shuffleCards = () => {
         let newData: any = [...data, ...data]
@@ -66,38 +93,58 @@ const Game = () => {
         setCardList(newData);
     }
 
-    // const renderItem = (item: any) => {
-    //     return (
-    //         <View style={appStyles.card}>
-    //             <Image source={item}/>
-    //         </View>
-    //     )
-    // }
+    
+
+    const handleItemClick = (item: ItemMemorizer, index: number) => {
+        if (action !== ActionMemorizer.PLAYING) return
+    
+        if (item.state === State.HIDED) {
+          let visibleItems = memorizerGrid.filter(i => i.state === State.VISIBLE)
+          let newState = State.VISIBLE
+          let newMemorizerGrid = [...memorizerGrid]
+    
+          if (visibleItems.length == 1 && visibleItems.some(i => i.data === item.data)) {
+            newMemorizerGrid = memorizerGrid.map(i => i.data === item.data ? { ...i, state: State.MATCHED } : i)
+            newState = State.MATCHED
+          } else if (visibleItems.length > 1) {
+            newMemorizerGrid = memorizerGrid.map(i => i.state === State.VISIBLE ? { ...i, state: State.HIDED } : i)
+          }
+    
+          newMemorizerGrid[index] = {
+            ...item,
+            state: newState
+          }
+          setMemorizerGrid(newMemorizerGrid)
+        }
+    }
+    
 
     return(
             <View>
                 <Text style={appStyles.title}>Jogo da memória</Text>
 
-                <Text style={appStyles.timer}>{getTimeFormatted()}</Text>
+                <Text style={[appStyles.timer, action === ActionMemorizer.PLAYING ? {} : appStyles.disabled]}>{getTimeFormatted()}</Text>
 
                 <Button title={running ? 'Reiniciar' : 'Iniciar'} onPress={startTimer} />
 
                 <FlatList 
-                    style={appStyles.flatList}
-                    data={cardList}
-                    renderItem={({item}) => {
-                        return(
-                            <View style={appStyles.card}>
-                                <Image source={{uri: item}}/>
-                            </View>
-                        ) 
-                    }}
+                    scrollEnabled={false}
+                    data={memorizerGrid}
+                    keyExtractor={(grid, index) => `${grid}_${index}`}
                     numColumns={4}
-                    keyExtractor={(_, index) => index.toString()}
-                    contentContainerStyle={{ padding: 10 }}
-                />
+                    renderItem={({ item, index }) => (
+                      <TouchableWithoutFeedback onPress={() => { handleItemClick(item, index) }}>
+                        <View style={[appStyles.item, action === ActionMemorizer.PLAYING && 
+                            item.state !== State.MATCHED ? {} : appStyles.disabled]}>
+                          <Text style={appStyles.item_content}>{item.state !== State.HIDED ? item.data : ""}</Text>
+                        </View>
+                      </TouchableWithoutFeedback>
+                    )}
+                  />
 
-            <Text style={appStyles.message}>Faltam { 0 /*pairsCount*/} pares</Text>
+        <Text style={[appStyles.message, action === ActionMemorizer.PLAYING ? {} :
+             appStyles.disabled]}>Ainda faltam {pairsLeft} pares.</Text>
+        <Button color='black' title={running ? 'Reiniciar' : 'Iniciar'} onPress={toggleRunning} />
             </View>
     )
 }
@@ -123,6 +170,7 @@ const appStyles = StyleSheet.create({
     timer: {
         color: "#ffffff",
         fontSize: 48,
+        textAlign: 'center'
     },
     message: {
         color: "#ffffff",
@@ -149,7 +197,24 @@ const appStyles = StyleSheet.create({
         backgroundColor: "#ffffff",
         padding: 20,
         margin: cardMargin
-    }
+    },
+    item: {
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        margin: 5,
+        borderWidth: 5,
+        borderColor: '#304494',
+        width: 75,
+        height: 75,
+      },
+      item_content: {
+        fontSize: 38,
+      },
+      disabled: {
+        color: 'grey',
+        borderColor: 'grey'
+      }
 })
 
 
